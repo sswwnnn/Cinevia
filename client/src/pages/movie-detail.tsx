@@ -2,13 +2,13 @@ import React, { useState } from 'react';
 import { useParams, Link } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { getMovieDetails, getImageUrl } from '@/lib/api';
-import MovieReviewModal from '@/components/MovieReviewModal';
 import { useAuth } from '@/hooks/use-auth';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader } from '@/components/ui/loader';
 import { useToast } from '@/hooks/use-toast';
+import MovieReviewModal from '@/components/MovieReviewModal';
 import MovieCard from '@/components/MovieCard';
 import { 
   Play, 
@@ -382,11 +382,7 @@ const MovieDetail = () => {
                 
                 {/* Actions */}
                 <div className="flex items-center gap-3">
-                  <Button 
-                    variant="outline" 
-                    size="icon" 
-                    className="w-12 h-12 rounded-full bg-gray-800 flex items-center justify-center"
-                  >
+                  <Button variant="outline" size="icon" className="w-12 h-12 rounded-full bg-gray-800 flex items-center justify-center">
                     <ListPlus className="h-5 w-5" />
                   </Button>
                   <Button 
@@ -405,47 +401,8 @@ const MovieDetail = () => {
                   >
                     <Bookmark className="h-5 w-5" fill={watchlistStatus ? "white" : "none"} />
                   </Button>
-                  <Button 
-                    variant="outline" 
-                    size="icon" 
-                    className={`w-12 h-12 rounded-full ${watchedStatus ? 'bg-primary' : 'bg-gray-800'} flex items-center justify-center`}
-                    onClick={toggleWatched}
-                  >
-                    <CheckCircle2 className="h-5 w-5" fill={watchedStatus ? "white" : "none"} />
-                  </Button>
-                  {trailer && (
-                    <a 
-                      href={`https://www.youtube.com/watch?v=${trailer.key}`} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-md"
-                    >
-                      <Play className="h-4 w-4" />
-                      <span>Play Trailer</span>
-                    </a>
-                  )}
-                </div>
-
-                {/* New Actions (ADDED as requested) */}
-                <div className="flex items-center gap-3 mt-3">
-                  <Button 
-                    variant="outline" 
-                    size="icon" 
-                    className={`w-12 h-12 rounded-full ${watchlistStatus ? 'bg-primary' : 'bg-gray-800'} flex items-center justify-center`}
-                    onClick={toggleWatchlist}
-                  >
-                    <Bookmark className="h-5 w-5" fill={watchlistStatus ? "white" : "none"} />
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="icon" 
-                    className={`w-12 h-12 rounded-full ${favoriteStatus ? 'bg-primary' : 'bg-gray-800'} flex items-center justify-center`}
-                    onClick={toggleFavorites}
-                  >
-                    <Heart className="h-5 w-5" fill={favoriteStatus ? "white" : "none"} />
-                  </Button>
-
-                  {/* This is the new Review Modal */}
+                  
+                  {/* Add MovieReviewModal here, replacing the CheckCircle2 button */}
                   <MovieReviewModal
                     movieId={movieId}
                     movieTitle={movie.title}
@@ -456,7 +413,7 @@ const MovieDetail = () => {
                       queryClient.invalidateQueries({ queryKey: [`/api/diary/status/${movieId}`] });
                     }}
                   />
-
+                  
                   {trailer && (
                     <a 
                       href={`https://www.youtube.com/watch?v=${trailer.key}`} 
@@ -469,6 +426,25 @@ const MovieDetail = () => {
                     </a>
                   )}
                 </div>
+              </div>
+              
+              {/* Tagline & Overview */}
+              <div className="mb-6">
+                {movie.tagline && (
+                  <p className="text-gray-400 italic mb-2">{movie.tagline}</p>
+                )}
+                <h3 className="text-xl font-bold mb-2">Overview</h3>
+                <p>{movie.overview}</p>
+              </div>
+              
+              {/* Creator */}
+              <div>
+                {movie.credits?.crew?.filter((person: any) => person.job === 'Director').map((director: any) => (
+                  <div key={director.id} className="flex flex-col">
+                    <span className="font-semibold">{director.name}</span>
+                    <span className="text-sm text-gray-400">Director</span>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -760,23 +736,21 @@ const MovieDetail = () => {
                 <div key={recommendation.id} className="flex-shrink-0 w-[250px]">
                   <div className="relative rounded-lg overflow-hidden group aspect-video">
                     <Link href={`/movie/${recommendation.id}`}>
-                      <a>
-                        <img 
-                          src={recommendation.backdrop_path 
-                            ? getImageUrl(recommendation.backdrop_path, 'w500') 
-                            : 'https://via.placeholder.com/500x281?text=No+Image'} 
-                          alt={recommendation.title} 
-                          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                        />
-                        <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black to-transparent">
-                          <div className="flex justify-between items-center">
-                            <h3 className="font-medium">{recommendation.title}</h3>
-                            <div className="bg-black/70 text-white px-2 py-0.5 rounded text-xs">
-                              {Math.round(recommendation.vote_average * 10)}%
-                            </div>
+                      <img 
+                        src={recommendation.backdrop_path 
+                          ? getImageUrl(recommendation.backdrop_path, 'w500') 
+                          : 'https://via.placeholder.com/500x281?text=No+Image'} 
+                        alt={recommendation.title} 
+                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      />
+                      <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black to-transparent">
+                        <div className="flex justify-between items-center">
+                          <h3 className="font-medium">{recommendation.title}</h3>
+                          <div className="bg-black/70 text-white px-2 py-0.5 rounded text-xs">
+                            {Math.round(recommendation.vote_average * 10)}%
                           </div>
                         </div>
-                      </a>
+                      </div>
                     </Link>
                   </div>
                 </div>
