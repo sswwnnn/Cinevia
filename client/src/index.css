@@ -1,0 +1,68 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply font-sans antialiased bg-gray-900 text-white;
+  }
+
+  .netflix-red {
+    @apply bg-primary text-white;
+  }
+
+  .tmdb-teal {
+    @apply bg-[#01B4E4] text-black;
+  }
+
+  .rating-high {
+    @apply bg-[#21D07A] text-black;
+  }
+
+  .rating-medium {
+    @apply bg-[#D2D531] text-black;
+  }
+
+  .rating-low {
+    @apply bg-[#DB2360] text-black;
+  }
+}
+
+@layer components {
+  .movie-card {
+    @apply relative rounded-lg overflow-hidden transition-transform duration-300 hover:scale-105;
+  }
+  
+  .movie-card-overlay {
+    @apply absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black to-transparent opacity-0 group-hover:opacity-100 transition-opacity;
+  }
+  
+  .conic-gradient-high {
+    background: conic-gradient(#21D07A 0% var(--percentage), #204529 var(--percentage) 100%);
+  }
+  
+  .conic-gradient-medium {
+    background: conic-gradient(#D2D531 0% var(--percentage), #204529 var(--percentage) 100%);
+  }
+  
+  .conic-gradient-low {
+    background: conic-gradient(#DB2360 0% var(--percentage), #204529 var(--percentage) 100%);
+  }
+}
+
+@keyframes slide {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.poster-animation {
+  animation: slide 60s linear infinite;
+}
