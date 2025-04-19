@@ -366,6 +366,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Add this to your routes.ts file
+app.get("/api/user/:userId/followers/with-info", async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId);
+    
+    // Get all followers
+    const follows = await storage.getFollowers(userId);
+    
+    // Get user info for each follower
+    const followersWithInfo = await Promise.all(
+      follows.map(async (follow) => {
+        const followerUser = await storage.getUser(follow.followerId);
+        
+        // Check if current user is following this follower
+        let isFollowedByMe = false;
+        if (req.isAuthenticated()) {
+          isFollowedByMe = await storage.isFollowing(req.user!.id, follow.followerId);
+        }
+        
+        return {
+          ...follow,
+          followerUser: followerUser ? {
+            id: followerUser.id,
+            username: followerUser.username,
+            avatarUrl: followerUser.avatarUrl
+          } : null,
+          isFollowedByMe
+        };
+      })
+    );
+    
+    res.json(followersWithInfo);
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
   // Lists Routes
   app.post("/api/lists", isAuthenticated, async (req, res) => {
     try {
