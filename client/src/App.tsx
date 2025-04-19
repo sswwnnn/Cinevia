@@ -35,6 +35,9 @@ function Router() {
           <Route path="/profile/:username">
             <ProfilePage />
           </Route>
+          <Route path="/user/:username">
+            <ProfilePage />
+           </Route>
           <Route path="/profile/:username/favorites">
             <ProfilePage defaultTab="favorites" />
           </Route>
