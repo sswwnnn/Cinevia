@@ -3,176 +3,199 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'wouter';
 import { format } from 'date-fns';
 import { getImageUrl } from '@/lib/api';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Card, CardContent } from '@/components/ui/card';
-import { Loader } from '@/components/ui/loader';
-import { Star, StarHalf, Heart, BookmarkCheck } from 'lucide-react';
+import { Star } from 'lucide-react';
 
 interface ActivityListProps {
   userId: number;
   limit?: number;
 }
 
-const ActivityList: React.FC<ActivityListProps> = ({ userId, limit }) => {
-  const { data: userData } = useQuery({
-    queryKey: ['user', userId],
-    queryFn: async () => {
-      const res = await fetch(`/api/user/${userId}`);
-      if (!res.ok) throw new Error('Failed to fetch user');
-      return res.json();
-    },
-    enabled: !!userId,
-  });
+interface Movie {
+  id: number;
+  title: string;
+  poster_path: string | null;
+  release_date: string;
+}
 
+interface Activity {
+  id: number;
+  userId: number;
+  movieId: number;
+  type: 'favorite' | 'watchlist' | 'watched' | 'review';
+  rating?: number;
+  review?: string;
+  createdAt: string;
+  movie?: Movie; // The API might already include movie data
+}
+
+const ActivityList: React.FC<ActivityListProps> = ({ userId, limit }) => {
+  // Single request that returns activities with movie data included
   const {
     data: activities,
-    isLoading: isActivityLoading,
-    error: activityError,
+    isLoading,
+    error,
   } = useQuery({
-    queryKey: ['user-activity', userId],
+    queryKey: ['user-activities', userId],
     queryFn: async () => {
-      const res = await fetch(`/api/user/${userId}/activity`);
-      if (!res.ok) throw new Error('Failed to fetch activities');
-      return res.json();
+      // Try to get activities with movie data included
+      try {
+        const res = await fetch(`/api/user/${userId}/activities-with-movies`);
+        if (res.ok) {
+          const data = await res.json();
+          return data;
+        }
+      } catch (e) {
+        console.warn("Couldn't fetch combined data, falling back to separate requests");
+      }
+
+      // Fallback: Get activities and movies separately
+      const activitiesRes = await fetch(`/api/user/${userId}/activity`);
+      if (!activitiesRes.ok) throw new Error('Failed to fetch activities');
+      
+      const activitiesData = await activitiesRes.json();
+      
+      if (!activitiesData || activitiesData.length === 0) {
+        return [];
+      }
+      
+      // Get unique movie IDs
+      const movieIdsSet = new Set<number>();
+      activitiesData.forEach((a: Activity) => {
+        if (a.movieId) movieIdsSet.add(a.movieId);
+      });
+      const movieIds = Array.from(movieIdsSet);
+      
+      if (movieIds.length === 0) {
+        return activitiesData;
+      }
+      
+      // Fetch movies one by one to avoid errors with batch requests
+      const movies: Movie[] = [];
+      
+      for (const movieId of movieIds) {
+        try {
+          const movieRes = await fetch(`/api/tmdb/movie/${movieId}`);
+          if (movieRes.ok) {
+            const movieData = await movieRes.json();
+            movies.push(movieData);
+          }
+        } catch (e) {
+          console.error(`Failed to fetch movie ${movieId}`, e);
+        }
+      }
+      
+      // Combine the data
+      return activitiesData.map((activity: Activity) => {
+        const movie = movies.find(m => m.id === activity.movieId);
+        return {
+          ...activity,
+          movie: movie || {
+            id: activity.movieId,
+            title: `Movie ${activity.movieId}`,
+            poster_path: null,
+            release_date: new Date().toISOString().split('T')[0],
+          }
+        };
+      });
     },
     enabled: !!userId,
   });
 
-  // Build list of movie IDs
-  const movieIds = activities?.map((a: any) => a.movieId).join(',') ?? '';
-
-  const {
-    data: movies,
-    isLoading: isMovieLoading,
-    error: movieError,
-  } = useQuery({
-    queryKey: ['movie-cache', movieIds],
-    queryFn: async () => {
-      const res = await fetch(`/api/tmdb/movie/${movieIds}`);
-      if (!res.ok) throw new Error('Failed to fetch movies');
-      const json = await res.json();
-      // Sometimes it's a single movie, sometimes an array — normalize it
-      return Array.isArray(json) ? json : json.movies ?? [];
-    },
-    enabled: !!movieIds,
-  });
-
-  const isLoading = isActivityLoading || isMovieLoading;
-
   if (isLoading) {
-    return <Loader text="Loading activity..." />;
+    return (
+      <div className="flex justify-center items-center py-12">
+        <div className="w-8 h-8 border-4 border-t-red-600 border-red-600/30 rounded-full animate-spin"></div>
+      </div>
+    );
   }
 
-  if (activityError || movieError) {
-    console.error('Fetch error:', activityError || movieError);
-    return <div className="text-center py-4 text-gray-400">Failed to load activity.</div>;
+  if (error) {
+    console.error("Activity fetch error:", error);
+    return <div className="text-center py-8 text-gray-400">Failed to load activity.</div>;
   }
 
   if (!activities || activities.length === 0) {
-    return <div className="text-center py-4 text-gray-400">No recent activity.</div>;
+    return <div className="text-center py-8 text-gray-400">No recent activity.</div>;
   }
 
   const entries = limit ? activities.slice(0, limit) : activities;
 
-  const getMovieDetails = (movieId: number) => {
-    return (
-      movies?.find((m: any) => m.id === movieId) ?? {
-        title: `Movie ${movieId}`,
-        poster_path: null,
-        release_date: new Date().toISOString().split('T')[0],
-      }
-    );
+  const getPosterUrl = (posterPath: string | null): string => {
+    if (!posterPath) return '/images/placeholder-poster.png'; // Provide a fallback image
+    return getImageUrl(posterPath as string, 'w92');
   };
 
   const renderRating = (rating: number) => {
     const stars = [];
-    const fullStars = Math.floor(rating);
-    const hasHalfStar = rating % 1 >= 0.5;
-    for (let i = 0; i < fullStars; i++) {
-      stars.push(<Star key={`star-${i}`} className="fill-yellow-400 text-yellow-400" size={16} />);
-    }
-    if (hasHalfStar) {
-      stars.push(<StarHalf key="half-star" className="fill-yellow-400 text-yellow-400" size={16} />);
+    for (let i = 0; i < 5; i++) {
+      stars.push(
+        <Star 
+          key={`star-${i}`} 
+          size={16}
+          className={i < rating ? "fill-red-600 text-red-600" : "text-gray-600"} 
+        />
+      );
     }
     return <div className="flex">{stars}</div>;
   };
 
+  const getActivityVerb = (type: string) => {
+    switch (type) {
+      case 'favorite': return 'favorited';
+      case 'watchlist': return 'added to watchlist';
+      case 'watched': return 'watched';
+      case 'review': return 'reviewed';
+      default: return 'interacted with';
+    }
+  };
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {entries.map((activity: any) => {
-        const movie = getMovieDetails(activity.movieId);
+    <div className="space-y-6">
+      {entries.map((activity: Activity) => {
+        const movie = activity.movie || {
+          id: activity.movieId,
+          title: `Movie ${activity.movieId}`,
+          poster_path: null,
+          release_date: new Date().toISOString().split('T')[0],
+        };
+        
         return (
-          <Card key={activity.id} className="bg-gray-800">
-            <CardContent className="p-0">
-              <div className="p-4 border-b border-gray-700">
-                <div className="flex items-center gap-3">
-                  <Avatar>
-                    <AvatarImage src={userData?.avatarUrl} alt={userData?.username} />
-                    <AvatarFallback>
-                      {userData?.username?.substring(0, 2).toUpperCase() || 'UN'}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <div className="font-medium">{userData?.username}</div>
-                    <div className="text-sm text-gray-400">
-                      {activity.type === 'favorite' && 'favorited'}
-                      {activity.type === 'watchlist' && 'added to watchlist'}
-                      {activity.type === 'watched' && 'watched'}
-                      {activity.type === 'review' && 'reviewed'}
-                      {' • '}
-                      {format(new Date(activity.createdAt), 'MMM d, yyyy')}
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="flex p-4">
+          <div key={activity.id} className="border-b border-gray-800 pb-6">
+            <div className="flex">
+              <div className="w-12 h-16 mr-4">
                 <Link href={`/movie/${activity.movieId}`}>
-                  <div className="w-16 flex-shrink-0">
-                    <div className="aspect-[2/3] rounded overflow-hidden">
-                      <img
-                        src={
-                          movie.poster_path
-                            ? getImageUrl(movie.poster_path, 'w92')
-                            : 'https://via.placeholder.com/92x138?text=No+Image'
-                        }
-                        alt={movie.title}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
+                  <div className="aspect-[2/3] rounded overflow-hidden h-full">
+                    <img
+                      src={getPosterUrl(movie.poster_path)} // Ensure valid URL
+                      alt={movie.title || "Movie poster"}
+                      className="w-full h-full object-cover"
+                    />
                   </div>
                 </Link>
-                <div className="ml-3">
-                  <h3 className="font-bold">
-                    <Link href={`/movie/${activity.movieId}`}>{movie.title}</Link>
-                  </h3>
-                  {activity.type === 'favorite' && (
-                    <div className="flex items-center gap-1 text-primary mt-1">
-                      <Heart size={16} className="fill-primary" />
-                      <span className="text-sm">Added to favorites</span>
-                    </div>
-                  )}
-                  {activity.type === 'watchlist' && (
-                    <div className="flex items-center gap-1 text-primary mt-1">
-                      <BookmarkCheck size={16} className="fill-primary" />
-                      <span className="text-sm">Added to watchlist</span>
-                    </div>
-                  )}
-                  {activity.rating && (
-                    <div className="flex text-yellow-400 text-sm my-1">
-                      {renderRating(activity.rating)}
-                    </div>
-                  )}
-                  {activity.review && (
-                    <p className="text-sm text-gray-300">
-                      {activity.review.length > 120
-                        ? `${activity.review.substring(0, 120)}...`
-                        : activity.review}
-                    </p>
-                  )}
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-green-400">ishia</span>
+                  <span className="text-gray-400">{getActivityVerb(activity.type)}</span>
+                  <Link href={`/movie/${activity.movieId}`}>
+                    <span className="font-semibold text-white hover:text-red-600 transition">{movie.title}</span>
+                  </Link>
+                </div>
+                
+                {activity.rating && activity.rating > 0 && (
+                  <div className="mt-2">{renderRating(activity.rating)}</div>
+                )}
+                
+                {activity.review && (
+                  <p className="mt-2 text-gray-300">{activity.review}</p>
+                )}
+                
+                <div className="mt-2 text-sm text-gray-500">
+                  {format(new Date(activity.createdAt), 'MM/dd/yyyy')}
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         );
       })}
     </div>
@@ -180,28 +203,3 @@ const ActivityList: React.FC<ActivityListProps> = ({ userId, limit }) => {
 };
 
 export default ActivityList;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
