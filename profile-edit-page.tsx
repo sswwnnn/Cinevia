@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useLocation, useLocation as useNavigate } from 'wouter'; // Corrected import
+import ImageUploader from '@/components/ui/image-uploader'; // Corrected import
 
 const ProfileEditPage = () => {
   const { user, updateUser } = useAuth();
@@ -19,12 +20,12 @@ const ProfileEditPage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await updateUser(formData);
+      await updateUser(formData); // Ensure this function is correctly implemented
       toast({
         title: 'Success',
         description: 'Profile updated successfully',
       });
-      setLocation(`/profile/${user?.username}`); // Corrected navigation
+      setLocation(`/profile/${user?.username}`); // Ensure navigation is correct
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -39,11 +40,10 @@ const ProfileEditPage = () => {
       <h1 className="text-3xl font-bold mb-6">Edit Profile</h1>
       <form onSubmit={handleSubmit} className="max-w-2xl space-y-6">
         <div>
-          <label className="block mb-2">Avatar URL</label>
-          <Input
-            value={formData.avatarUrl}
-            onChange={(e) => setFormData(prev => ({ ...prev, avatarUrl: e.target.value }))}
-            placeholder="Enter avatar URL"
+          <label className="block mb-2">Avatar</label>
+          <ImageUploader
+            imageUrl={formData.avatarUrl}
+            onUpload={(url: string) => setFormData(prev => ({ ...prev, avatarUrl: url }))}
           />
         </div>
         <div>
