@@ -6,6 +6,10 @@ import { useAuth } from '@/hooks/use-auth';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import ProfileStats from '@/components/profile/ProfileStats';
 import DiaryList from '@/components/profile/DiaryList';
@@ -16,12 +20,19 @@ import FavoritesList from '@/components/profile/FavoritesList';
 import WatchList from '@/components/profile/WatchList';
 import FilmsList from '@/components/profile/FilmsList';
 import { Edit, UserCheck, UserPlus, Calendar, Heart, BookmarkIcon, ListIcon, Loader } from 'lucide-react';
+import { useLocation } from 'wouter'; // Use useLocation from wouter
 
-const ProfilePage = () => {
-  const { username } = useParams();
+interface ProfilePageProps {
+    defaultTab?: string; // Add this line to define the defaultTab prop
+}
+
+const ProfilePage: React.FC<ProfilePageProps> = ({ defaultTab }) => {
+  const { username } = useParams(); // Ensure useParams is used to get the username
   const { user } = useAuth();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('profile');
+  const [location, navigate] = useLocation(); // Use useLocation to get the navigate function
+  const [isCreateListDialogOpen, setIsCreateListDialogOpen] = useState(false); // Add state for dialog
 
   // Fetch user data
   const { data: profileUser, isLoading: userLoading, error: userError } = useQuery({
@@ -134,6 +145,10 @@ const ProfilePage = () => {
 
   const isOwnProfile = user && user.id === profileUser.id;
 
+  const navigateToEditProfile = () => {
+    navigate(`/edit-profile/${username}`); // Use navigate to change the route
+  };
+
   return (
     <div className="min-h-screen bg-gray-900">
       {/* Profile Header */}
@@ -159,7 +174,7 @@ const ProfilePage = () => {
 
               <div className="mt-4 flex flex-wrap gap-3 justify-center md:justify-start">
                 {isOwnProfile ? (
-                  <Button variant="outline" className="gap-2">
+                  <Button variant="outline" className="gap-2" onClick={navigateToEditProfile}>
                     <Edit className="h-4 w-4" />
                     Edit Profile
                   </Button>
@@ -324,9 +339,65 @@ const ProfilePage = () => {
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold">LISTS</h2>
                 {isOwnProfile && (
-                  <Button variant="default" className="bg-primary hover:bg-primary/90">
-                    Create New List
-                  </Button>
+                  <Dialog open={isCreateListDialogOpen} onOpenChange={setIsCreateListDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="default" className="bg-primary hover:bg-primary/90">
+                        Create New List
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Create New List</DialogTitle>
+                      </DialogHeader>
+                      <form onSubmit={async (e) => {
+                        e.preventDefault();
+                        const form = e.currentTarget;
+                        const name = (form.elements.namedItem("title") as HTMLInputElement).value;
+                        const description = (form.elements.namedItem("description") as HTMLTextAreaElement).value;
+                        const isPublic = (form.elements.namedItem("isPublic") as HTMLInputElement)?.checked ?? true;
+
+                        if (!name) return;
+
+                        try {
+                          await apiRequest("POST", "/api/lists", { name, description, isPublic });
+                          toast({
+                            title: 'Success',
+                            description: `List "${name}" created successfully`,
+                          });
+                          // Refresh the lists data instead of full page reload
+                          queryClient.invalidateQueries({ queryKey: [`/api/user/${profileUser.id}/lists`] });
+                          // Close the dialog
+                          setIsCreateListDialogOpen(false);
+                        } catch (error) {
+                          console.error("Failed to create list:", error);
+                          toast({
+                            title: 'Error',
+                            description: 'Failed to create list',
+                            variant: 'destructive',
+                          });
+                        }
+                      }}>
+                        <div className="space-y-4 py-4">
+                          <div>
+                            <Label htmlFor="title">List Title</Label>
+                            <Input id="title" name="title" required />
+                          </div>
+                          <div>
+                            <Label htmlFor="description">Description</Label>
+                            <Textarea id="description" name="description" />
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <input type="checkbox" id="isPublic" name="isPublic" defaultChecked className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" />
+                            <Label htmlFor="isPublic">Make this list public</Label>
+                          </div>
+                        </div>
+                        <DialogFooter>
+                          <Button type="button" variant="outline" onClick={() => setIsCreateListDialogOpen(false)}>Cancel</Button>
+                          <Button type="submit">Create List</Button>
+                        </DialogFooter>
+                      </form>
+                    </DialogContent>
+                  </Dialog>
                 )}
               </div>
 
