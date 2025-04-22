@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 
-import Navbar from "@/components/navbar";
-import Footer from "@/components/footer";
+import { NavigationMenu }  from "@/components/ui/navigation-menu";
+import Footer from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest } from "@/lib/queryClient";
-import MovieCard from "@/components/movie-card"; // Make sure this path is correct
+import MovieCard from "@/components/MovieCard"; // Make sure this path is correct
 
 interface Movie {
   id: string;
@@ -29,6 +29,7 @@ interface MovieList {
 export default function ListsPage() {
   const { user } = useAuth();
   const [lists, setLists] = useState<MovieList[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false); // State to control modal visibility
 
   useEffect(() => {
     if (user) {
@@ -57,6 +58,7 @@ export default function ListsPage() {
     try {
       await apiRequest("POST", "/api/lists", { name, description });
       loadLists(); // Reload lists instead of full page refresh
+      setIsModalOpen(false); // Close the modal after submission
     } catch (error) {
       console.error("Failed to create list:", error);
     }
@@ -64,7 +66,7 @@ export default function ListsPage() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Navbar />
+      <NavigationMenu/>
       <main className="flex-grow container mx-auto px-4 py-8">
         <h1 className="text-3xl font-bold mb-6">Movie Lists</h1>
 
@@ -75,31 +77,34 @@ export default function ListsPage() {
           </p>
 
           {user && (
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button variant="outline">Create New List</Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Create New List</DialogTitle>
-                </DialogHeader>
-                <form onSubmit={handleSubmit}>
-                  <div className="space-y-4 py-4">
-                    <div>
-                      <Label htmlFor="title">List Title</Label>
-                      <Input id="title" name="title" required />
-                    </div>
-                    <div>
-                      <Label htmlFor="description">Description</Label>
-                      <Textarea id="description" name="description" />
-                    </div>
-                  </div>
-                  <DialogFooter>
-                    <Button type="submit">Create List</Button>
-                  </DialogFooter>
-                </form>
-              </DialogContent>
-            </Dialog>
+            <>
+              <Button variant="outline" onClick={() => setIsModalOpen(true)}>Create New List</Button>
+              {isModalOpen && (
+                <Dialog>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Create New List</DialogTitle>
+                    </DialogHeader>
+                    <form onSubmit={handleSubmit}>
+                      <div className="space-y-4 py-4">
+                        <div>
+                          <Label htmlFor="title">List Title</Label>
+                          <Input id="title" name="title" required />
+                        </div>
+                        <div>
+                          <Label htmlFor="description">Description</Label>
+                          <Textarea id="description" name="description" />
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button type="submit">Create List</Button>
+                        <Button variant="outline" onClick={() => setIsModalOpen(false)}>Cancel</Button>
+                      </DialogFooter>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              )}
+            </>
           )}
 
           <div className="mt-8 grid gap-6">
@@ -111,7 +116,13 @@ export default function ListsPage() {
                 {list.items?.length ? (
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     {list.items.map((item) => (
-                      <MovieCard key={item.id} movie={item} />
+                      <MovieCard 
+                        key={item.id} 
+                        id={Number(item.id)} // Convert id to number
+                        title={item.title}
+                        posterPath={item.poster_path ?? null} // Ensure posterPath is string or null
+                        // Add other necessary props here if needed
+                      />
                     ))}
                   </div>
                 ) : (
