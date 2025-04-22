@@ -14,6 +14,7 @@ import { apiRequest } from "@/lib/queryClient";
 import MovieCard from "@/components/MovieCard";
 import { Search, Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import AddToListModal from '@/components/AddToListModal';
 
 interface Movie {
   id: string;
@@ -155,6 +156,7 @@ export default function ListsPage() {
                       <Label htmlFor="description" className="text-lg font-semibold text-gray-200">Description</Label>
                       <Textarea id="description" name="description" className="bg-gray-900 border-gray-700 focus:border-red-600 text-white" />
                     </div>
+                    <AddToListModal movieId={selectedMovies.map(movie => movie.id)} movieTitle={selectedMovies.map(movie => movie.title)} />
                     <div>
                       <Label className="text-lg font-semibold text-gray-200">Add Movies</Label>
                       <div className="relative">
